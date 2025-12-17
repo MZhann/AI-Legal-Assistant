@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/store/useAuthStore";
 import { userChatService } from "@/services/auth";
 import { lawyerService, LawyerChatPreview } from "@/services/lawyer";
+import { documentService, SavedDocument } from "@/services/documents";
 import {
   User,
   MessageSquare,
@@ -21,6 +22,9 @@ import {
   Loader2,
   Scale,
   Circle,
+  Download,
+  FileWarning,
+  FileX,
 } from "lucide-react";
 
 interface ChatSession {
@@ -37,6 +41,7 @@ export default function ProfilePage() {
   const { user, token, isAuthenticated, logout } = useAuthStore();
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [lawyerChats, setLawyerChats] = useState<LawyerChatPreview[]>([]);
+  const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -70,10 +75,50 @@ export default function ProfilePage() {
       if (lawyerResponse.success) {
         setLawyerChats(lawyerResponse.data.chats);
       }
+
+      // Load documents
+      const docsResponse = await documentService.getMyDocuments(token);
+      if (docsResponse.success) {
+        setDocuments(docsResponse.data.documents);
+      }
     } catch (error) {
-      console.error("Error loading chats:", error);
+      console.error("Error loading data:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownloadDocument = async (doc: SavedDocument) => {
+    if (!token) return;
+    try {
+      const response = await documentService.getDocument(token, doc.id);
+      if (response.success) {
+        documentService.downloadBase64(response.data.document.pdf, doc.filename);
+      }
+    } catch (error) {
+      console.error("Error downloading document:", error);
+    }
+  };
+
+  const handleDeleteDocument = async (id: string) => {
+    if (!token) return;
+    if (!confirm("Удалить этот документ?")) return;
+    try {
+      await documentService.deleteDocument(token, id);
+      setDocuments(documents.filter(d => d.id !== id));
+    } catch (error) {
+      console.error("Error deleting document:", error);
+    }
+  };
+
+  const getDocumentIcon = (type: string) => {
+    switch (type) {
+      case 'pretrial-claim':
+        return <FileWarning className="w-5 h-5 text-orange-400" />;
+      case 'resignation':
+        return <FileX className="w-5 h-5 text-purple-400" />;
+      default:
+        return <FileText className="w-5 h-5 text-blue-400" />;
     }
   };
 
@@ -181,18 +226,20 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="group cursor-pointer hover:border-gold-500/50 transition-colors opacity-50">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="w-12 h-12 rounded-lg bg-gold-500/10 flex items-center justify-center">
-              <FileText className="w-6 h-6 text-gold-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-white">Құжаттар / Документы</h3>
-              <p className="text-sm text-slate-400">Жақында / Скоро</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-slate-500" />
-          </CardContent>
-        </Card>
+        <Link href="/documents">
+          <Card className="group cursor-pointer hover:border-gold-500/50 transition-colors">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="w-12 h-12 rounded-lg bg-gold-500/10 flex items-center justify-center group-hover:bg-gold-500/20 transition-colors">
+                <FileText className="w-6 h-6 text-gold-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-white">Құжаттар / Документы</h3>
+                <p className="text-sm text-slate-400">{documents.length} құжат</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-500" />
+            </CardContent>
+          </Card>
+        </Link>
 
         <Link href="/lawyers">
           <Card className="group cursor-pointer hover:border-green-500/50 transition-colors">
@@ -283,6 +330,73 @@ export default function ProfilePage() {
                     </button>
                   </div>
                 </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Saved Documents */}
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-gold-400" />
+            Сохраненные документы
+          </CardTitle>
+          <Link href="/documents">
+            <Button variant="outline" className="border-gold-500/30 text-gold-400 hover:bg-gold-500/10">
+              <Plus className="w-4 h-4 mr-2" />
+              Жаңа құжат
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-400 text-sm mb-3">У вас пока нет сохраненных документов</p>
+              <Link href="/documents">
+                <Button variant="outline" size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Создать документ
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-gold-500/10 flex items-center justify-center">
+                    {getDocumentIcon(doc.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-white text-sm truncate">{doc.title}</h4>
+                    <p className="text-xs text-slate-500">{formatDate(doc.createdAt)}</p>
+                  </div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleDownloadDocument(doc)}
+                      className="p-2 text-slate-400 hover:text-gold-400 hover:bg-gold-500/10 rounded-lg transition-colors"
+                      title="Скачать"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDocument(doc.id)}
+                      className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      title="Удалить"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           )}

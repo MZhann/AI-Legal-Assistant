@@ -4,6 +4,7 @@ import chatRoutes from "./chat.routes.js";
 import authRoutes from "./auth.routes.js";
 import userRoutes from "./user.routes.js";
 import lawyerRoutes from "./lawyer.routes.js";
+import documentRoutes from "./document.routes.js";
 
 const router = Router();
 
@@ -21,5 +22,8 @@ router.use("/user", userRoutes);
 
 // Lawyer routes (real lawyer chat)
 router.use("/lawyers", lawyerRoutes);
+
+// Document routes (PDF generation)
+router.use("/documents", documentRoutes);
 
 export default router;

@@ -4,4 +4,6 @@ export { ChatSession } from './chat-session.model.js';
 export type { IChatSession, IChatMessage } from './chat-session.model.js';
 export { LawyerChat } from './lawyer-chat.model.js';
 export type { ILawyerChat, ILawyerMessage } from './lawyer-chat.model.js';
+export { UserDocument } from './document.model.js';
+export type { IDocument } from './document.model.js';
 
