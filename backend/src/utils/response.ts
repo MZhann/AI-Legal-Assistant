@@ -47,3 +47,22 @@ export function sendNoContent(res: Response): void {
   res.status(204).send();
 }
 
+// Helper functions for simple response objects
+export function success<T>(data: T): ApiResponse<T> {
+  return {
+    success: true,
+    data,
+  };
+}
+
+export function error(message: string, code?: string, details?: unknown): ApiResponse {
+  const errorObj: ApiResponse['error'] = { message };
+  if (code) errorObj.code = code;
+  if (details !== undefined) errorObj.details = details;
+  
+  return {
+    success: false,
+    error: errorObj,
+  };
+}
+

@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import type { Locale } from "@/i18n/config";
+
+// Locale type for future i18n integration
+export type Locale = "kk" | "ru" | "en";
 
 interface AppState {
   // UI state
@@ -18,6 +20,10 @@ interface AppState {
   // Mobile menu
   isMobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
+
+  // Locale
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -38,7 +44,8 @@ export const useAppStore = create<AppState>((set) => ({
   // Mobile menu
   isMobileMenuOpen: false,
   setMobileMenuOpen: (isMobileMenuOpen) => set({ isMobileMenuOpen }),
-}));
 
-// Type export for locale (re-export from config)
-export type { Locale };
+  // Locale - default to Russian
+  locale: "ru",
+  setLocale: (locale) => set({ locale }),
+}));

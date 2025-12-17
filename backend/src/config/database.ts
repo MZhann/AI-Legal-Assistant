@@ -22,8 +22,9 @@ export async function connectDatabase(): Promise<void> {
     });
 
   } catch (error) {
-    console.error('❌ Failed to connect to MongoDB:', error);
-    process.exit(1);
+    // MongoDB is optional - chat works without it (uses in-memory sessions)
+    console.warn('⚠️  MongoDB not available - running without database');
+    console.warn('   Chat will work, but sessions won\'t persist after restart');
   }
 }
 

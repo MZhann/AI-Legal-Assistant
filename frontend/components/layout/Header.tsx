@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useAuthStore } from "@/store/useAuthStore";
+import { User, LogOut } from "lucide-react";
 
 export function Header() {
+  const { user, isAuthenticated, logout } = useAuthStore();
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-700/50 bg-legal-darker/80 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -60,11 +64,43 @@ export function Header() {
             </Link>
           </nav>
 
-          {/* CTA Button */}
-          <div className="flex items-center gap-4">
-            <button className="legal-button text-sm">
-              Бастау
-            </button>
+          {/* Auth Buttons */}
+          <div className="flex items-center gap-3">
+            {isAuthenticated && user ? (
+              <>
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 text-sm text-slate-300 hover:text-primary-400 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500/20 to-gold-500/20 border border-primary-500/30 flex items-center justify-center">
+                    <User className="w-4 h-4 text-primary-400" />
+                  </div>
+                  <span className="hidden sm:inline">{user.firstName}</span>
+                </Link>
+                <button
+                  onClick={() => logout()}
+                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  title="Шығу / Выйти"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="text-sm text-slate-300 hover:text-primary-400 transition-colors"
+                >
+                  Кіру / Вход
+                </Link>
+                <Link
+                  href="/auth/register"
+                  className="legal-button text-sm"
+                >
+                  Тіркелу
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
