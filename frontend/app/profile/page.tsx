@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/store/useAuthStore";
 import { userChatService } from "@/services/auth";
+import { lawyerService, LawyerChatPreview } from "@/services/lawyer";
 import {
   User,
   MessageSquare,
@@ -19,6 +20,7 @@ import {
   ChevronRight,
   Loader2,
   Scale,
+  Circle,
 } from "lucide-react";
 
 interface ChatSession {
@@ -34,6 +36,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, token, isAuthenticated, logout } = useAuthStore();
   const [chats, setChats] = useState<ChatSession[]>([]);
+  const [lawyerChats, setLawyerChats] = useState<LawyerChatPreview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -43,16 +46,29 @@ export default function ProfilePage() {
       return;
     }
 
-    loadChats();
-  }, [isAuthenticated, token, router]);
+    // Redirect lawyers to their dashboard
+    if (user?.role === "lawyer") {
+      router.push("/lawyer");
+      return;
+    }
 
-  const loadChats = async () => {
+    loadAllChats();
+  }, [isAuthenticated, token, user, router]);
+
+  const loadAllChats = async () => {
     if (!token) return;
     
     try {
-      const response = await userChatService.getChats(token);
-      if (response.success) {
-        setChats(response.data.chats);
+      // Load AI chats
+      const aiResponse = await userChatService.getChats(token);
+      if (aiResponse.success) {
+        setChats(aiResponse.data.chats);
+      }
+      
+      // Load lawyer chats
+      const lawyerResponse = await lawyerService.getUserLawyerChats(token);
+      if (lawyerResponse.success) {
+        setLawyerChats(lawyerResponse.data.chats);
       }
     } catch (error) {
       console.error("Error loading chats:", error);
@@ -178,22 +194,24 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="group cursor-pointer hover:border-green-500/50 transition-colors opacity-50">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
-              <Users className="w-6 h-6 text-green-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium text-white">Заңгер / Юрист</h3>
-              <p className="text-sm text-slate-400">Жақында / Скоро</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-slate-500" />
-          </CardContent>
-        </Card>
+        <Link href="/lawyers">
+          <Card className="group cursor-pointer hover:border-green-500/50 transition-colors">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                <Users className="w-6 h-6 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-white">Заңгер / Юрист</h3>
+                <p className="text-sm text-slate-400">{lawyerChats.length} чат</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-500" />
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
-      {/* Chat History */}
-      <Card>
+      {/* AI Chat History */}
+      <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Scale className="w-5 h-5 text-primary-400" />
@@ -270,7 +288,89 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Lawyer Chat History */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-green-400" />
+            Шынайы заңгер чаттары / Чаты с юристами
+          </CardTitle>
+          <Link href="/lawyers">
+            <Button variant="outline" className="border-green-500/30 text-green-400 hover:bg-green-500/10">
+              <Plus className="w-4 h-4 mr-2" />
+              Заңгер таңдау
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-green-400" />
+            </div>
+          ) : lawyerChats.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400 mb-4">
+                Сізде әлі заңгермен чаттар жоқ
+              </p>
+              <p className="text-slate-500 text-sm mb-4">
+                У вас пока нет чатов с юристами
+              </p>
+              <Link href="/lawyers">
+                <Button className="bg-green-600 hover:bg-green-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Заңгер таңдау / Выбрать юриста
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {lawyerChats.map((chat) => (
+                <Link
+                  key={chat.id}
+                  href={`/lawyers/chat/${chat.id}`}
+                  className="block p-4 rounded-lg bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-green-500/30 transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                        <User className="w-5 h-5 text-green-400" />
+                      </div>
+                      {chat.lawyer.isOnline && (
+                        <Circle className="absolute -bottom-0.5 -right-0.5 w-3 h-3 fill-green-500 text-green-500" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-white truncate group-hover:text-green-400 transition-colors">
+                          {chat.lawyer.lastName} {chat.lawyer.firstName}
+                        </h3>
+                        {chat.unreadCount > 0 && (
+                          <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
+                            {chat.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      {chat.lastMessage && (
+                        <p className="text-sm text-slate-400 truncate mt-1">
+                          {chat.lastMessage}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 mt-1 text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatDate(chat.lastMessageAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

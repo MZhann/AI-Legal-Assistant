@@ -71,6 +71,7 @@ export const register = async (
         fatherName: user.fatherName,
         age: user.age,
         iin: user.iin,
+        role: user.role,
       },
       token,
     }));
@@ -127,6 +128,7 @@ export const login = async (
         fatherName: user.fatherName,
         age: user.age,
         iin: user.iin,
+        role: user.role,
       },
       token,
     }));

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type UserRole = 'user' | 'lawyer' | 'admin';
+
 export interface User {
   id: string;
   email: string;
@@ -9,6 +11,8 @@ export interface User {
   fatherName?: string;
   age: number;
   iin: string;
+  role: UserRole;
+  isOnline?: boolean;
   createdAt?: string;
 }
 

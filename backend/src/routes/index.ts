@@ -3,6 +3,7 @@ import healthRoutes from "./health.routes.js";
 import chatRoutes from "./chat.routes.js";
 import authRoutes from "./auth.routes.js";
 import userRoutes from "./user.routes.js";
+import lawyerRoutes from "./lawyer.routes.js";
 
 const router = Router();
 
@@ -18,8 +19,7 @@ router.use("/chat", chatRoutes);
 // User routes (authenticated - persistent chats)
 router.use("/user", userRoutes);
 
-// API v1 routes will be added here
-// router.use('/documents', documentRoutes);
-// router.use('/lawyers', lawyerRoutes);
+// Lawyer routes (real lawyer chat)
+router.use("/lawyers", lawyerRoutes);
 
 export default router;

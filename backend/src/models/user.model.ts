@@ -1,6 +1,8 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+export type UserRole = 'user' | 'lawyer' | 'admin';
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   email: string;
@@ -10,6 +12,9 @@ export interface IUser extends Document {
   fatherName?: string;    // Отчество (optional)
   age: number;
   iin: string;            // ИИН - Individual Identification Number (12 digits)
+  role: UserRole;         // user, lawyer, admin
+  isOnline: boolean;      // Online status for lawyers
+  lastSeen: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -59,6 +64,19 @@ const userSchema = new Schema<IUser>(
       required: [true, 'ИИН обязателен'],
       unique: true,
       match: [/^\d{12}$/, 'ИИН должен содержать 12 цифр'],
+    },
+    role: {
+      type: String,
+      enum: ['user', 'lawyer', 'admin'],
+      default: 'user',
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
     },
   },
   {

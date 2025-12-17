@@ -1,5 +1,7 @@
+import { createServer } from "http";
 import { createApp } from "./app.js";
 import { env, connectDatabase } from "./config/index.js";
+import { socketService } from "./services/socket.service.js";
 
 async function bootstrap(): Promise<void> {
   try {
@@ -9,14 +11,21 @@ async function bootstrap(): Promise<void> {
     // Create Express app
     const app = createApp();
 
+    // Create HTTP server
+    const server = createServer(app);
+
+    // Initialize Socket.io
+    socketService.initialize(server);
+
     // Start server
-    app.listen(env.port, () => {
+    server.listen(env.port, () => {
       console.log("🚀 ═══════════════════════════════════════════════════");
       console.log(`🚀 AI Legal Assistant API`);
       console.log(`🚀 Environment: ${env.nodeEnv}`);
       console.log(`🚀 Server running on port ${env.port}`);
       console.log(`🚀 API prefix: ${env.apiPrefix}`);
       console.log(`🚀 Health check: http://localhost:${env.port}/health`);
+      console.log(`🚀 WebSocket: ws://localhost:${env.port}`);
       console.log("🚀 ═══════════════════════════════════════════════════");
     });
   } catch (error) {

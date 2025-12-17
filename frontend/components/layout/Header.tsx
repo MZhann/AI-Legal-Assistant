@@ -68,14 +68,31 @@ export function Header() {
           <div className="flex items-center gap-3">
             {isAuthenticated && user ? (
               <>
+                {user.role === "lawyer" && (
+                  <Link
+                    href="/lawyer"
+                    className="text-sm text-green-400 hover:text-green-300 transition-colors hidden sm:inline"
+                  >
+                    Клиенттер
+                  </Link>
+                )}
                 <Link
-                  href="/profile"
+                  href={user.role === "lawyer" ? "/lawyer" : "/profile"}
                   className="flex items-center gap-2 text-sm text-slate-300 hover:text-primary-400 transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500/20 to-gold-500/20 border border-primary-500/30 flex items-center justify-center">
-                    <User className="w-4 h-4 text-primary-400" />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    user.role === "lawyer" 
+                      ? "bg-gradient-to-br from-green-500/20 to-primary-500/20 border border-green-500/30"
+                      : "bg-gradient-to-br from-primary-500/20 to-gold-500/20 border border-primary-500/30"
+                  }`}>
+                    <User className={`w-4 h-4 ${user.role === "lawyer" ? "text-green-400" : "text-primary-400"}`} />
                   </div>
                   <span className="hidden sm:inline">{user.firstName}</span>
+                  {user.role === "lawyer" && (
+                    <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded hidden md:inline">
+                      Заңгер
+                    </span>
+                  )}
                 </Link>
                 <button
                   onClick={() => logout()}
