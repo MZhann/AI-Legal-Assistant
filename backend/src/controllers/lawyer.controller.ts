@@ -8,7 +8,7 @@ import { AuthRequest } from '../middlewares/auth.middleware.js';
  * GET /lawyers
  */
 export const getLawyers = async (
-  req: AuthRequest,
+  _req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

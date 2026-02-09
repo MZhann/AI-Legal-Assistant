@@ -9,9 +9,11 @@ import { AuthRequest } from '../middlewares/auth.middleware.js';
  * Generate JWT token
  */
 const generateToken = (userId: string): string => {
-  return jwt.sign({ id: userId }, env.jwtSecret, {
-    expiresIn: env.jwtExpiresIn,
-  });
+  return jwt.sign(
+    { id: userId },
+    env.jwtSecret as jwt.Secret,
+    { expiresIn: env.jwtExpiresIn } as jwt.SignOptions
+  );
 };
 
 /**

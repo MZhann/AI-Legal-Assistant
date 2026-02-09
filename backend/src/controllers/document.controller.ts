@@ -9,7 +9,7 @@ import { AuthRequest } from '../middlewares/auth.middleware.js';
  * GET /documents/types
  */
 export const getDocumentTypes = async (
-  req: Request,
+  _req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

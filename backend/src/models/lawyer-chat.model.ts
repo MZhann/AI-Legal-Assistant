@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ILawyerMessage {
+  _id?: mongoose.Types.ObjectId;
   sender: mongoose.Types.ObjectId;
   senderRole: 'user' | 'lawyer';
   content: string;
