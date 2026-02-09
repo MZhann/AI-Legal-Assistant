@@ -42,17 +42,21 @@ export default function LawyerDashboard() {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Check if user is lawyer
+  // Check if user is lawyer (delay so persisted auth can rehydrate from storage on reload)
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/auth/login");
-      return;
-    }
-    if (user?.role !== "lawyer") {
-      router.push("/profile");
-      return;
-    }
-    loadClients();
+    const id = setTimeout(() => {
+      const state = useAuthStore.getState();
+      if (!state.isAuthenticated) {
+        router.push("/auth/login");
+        return;
+      }
+      if (state.user?.role !== "lawyer") {
+        router.push("/profile");
+        return;
+      }
+      loadClients(state.token);
+    }, 50);
+    return () => clearTimeout(id);
   }, [isAuthenticated, user, router]);
 
   // Socket event handlers
@@ -82,10 +86,11 @@ export default function LawyerDashboard() {
     };
   }, [socket, selectedChat]);
 
-  const loadClients = async () => {
-    if (!token) return;
+  const loadClients = async (tokenOverride?: string | null) => {
+    const t = tokenOverride ?? token;
+    if (!t) return;
     try {
-      const response = await lawyerService.getClients(token);
+      const response = await lawyerService.getClients(t);
       if (response.success) {
         setClients(response.data.clients);
       }
