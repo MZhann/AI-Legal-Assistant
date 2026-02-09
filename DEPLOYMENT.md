@@ -6,9 +6,9 @@ This project uses **localhost only for development**. In production you set envi
 
 ## 1. Deploy backend on Railway
 
-1. Push your code to GitHub and connect the **repo root** to Railway (do not set a Root Directory).
-2. Railpack will detect Node from the root `package.json`, which runs **build** = `cd backend && npm ci && npm run build` and **start** = `cd backend && npm start`.
-3. You do not need to set a custom build or start command; the root `package.json` defines them.
+1. Connect your GitHub repo to Railway.
+2. Set **Root Directory** to **`backend`** (so Railway uses `backend/Dockerfile` and the backend folder as build context).
+3. Railway will detect the Dockerfile, build the image (Node + Chromium for document PDFs), and run `node dist/index.js`. No need to set a custom build or start command.
 
 ### Railway environment variables (backend)
 

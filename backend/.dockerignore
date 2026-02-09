@@ -1,0 +1,14 @@
+# Dependencies and build (reinstalled in image)
+node_modules
+dist
+
+# Env and secrets (use Railway Variables)
+.env
+.env.*
+.env.example
+env.example
+
+# Git, IDE, scripts
+.git
+*.log
+scripts

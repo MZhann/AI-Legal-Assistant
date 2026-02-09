@@ -1,0 +1,25 @@
+# Dependencies and build outputs
+node_modules
+backend/node_modules
+frontend/node_modules
+backend/dist
+.next
+
+# Env and secrets (use Railway Variables)
+.env
+.env.*
+backend/.env
+backend/.env.*
+
+# Git and IDE
+.git
+.cursor
+*.log
+.DS_Store
+
+# Docs and non-runtime
+docs
+frontend
+ai
+*.md
+!backend/README.md
