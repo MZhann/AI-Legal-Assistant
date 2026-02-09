@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import { existsSync } from 'fs';
 
 // Document types
 export type DocumentType = 'pretrial-claim' | 'explanatory' | 'resignation';
@@ -176,8 +177,19 @@ class DocumentService {
         throw new Error('Unknown document type');
     }
 
+    // Prefer system Chromium (Docker/Railway) to avoid missing libs with Puppeteer's downloaded Chrome
+    const systemChromePaths = [
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+    ].filter(Boolean) as string[];
+    const executablePath = systemChromePaths.find((p) => existsSync(p));
+
     const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
       headless: true,
+      ...(executablePath && { executablePath }),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -185,9 +197,6 @@ class DocumentService {
         '--disable-gpu',
       ],
     };
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
     const browser = await puppeteer.launch(launchOptions);
 
     try {
