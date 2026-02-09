@@ -1,0 +1,12 @@
+{
+  "name": "ai-legal-assistant",
+  "private": true,
+  "description": "Monorepo root for Railway backend deploy. Frontend deploys separately (Vercel).",
+  "scripts": {
+    "build": "cd backend && npm ci && npm run build",
+    "start": "cd backend && npm start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

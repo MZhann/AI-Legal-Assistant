@@ -6,11 +6,9 @@ This project uses **localhost only for development**. In production you set envi
 
 ## 1. Deploy backend on Railway
 
-1. Push your code to GitHub and connect the **backend** (or monorepo root) to Railway.
-2. Set **Root Directory** to `backend` if the repo is the full project.
-3. **Build command:** `npm run build`  
-   **Start command:** `npm start`  
-   **Watch paths:** `backend/**` (if monorepo)
+1. Push your code to GitHub and connect the **repo root** to Railway (do not set a Root Directory).
+2. Railpack will detect Node from the root `package.json`, which runs **build** = `cd backend && npm ci && npm run build` and **start** = `cd backend && npm start`.
+3. You do not need to set a custom build or start command; the root `package.json` defines them.
 
 ### Railway environment variables (backend)
 
