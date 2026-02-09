@@ -30,7 +30,7 @@ export function Header() {
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-semibold text-slate-100 group-hover:text-primary-400 transition-colors">
-                AI Legal Assistant
+                LawSense
               </span>
               <span className="text-xs text-slate-400">Қазақстан</span>
             </div>

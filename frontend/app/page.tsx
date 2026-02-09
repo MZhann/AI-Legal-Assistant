@@ -22,13 +22,13 @@ export default function HomePage() {
             </div>
 
             {/* Main Title */}
-            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6">
-              <span className="text-slate-100">AI </span>
-              <span className="text-gradient">Legal Assistant</span>
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-2">
+              <span className="text-gradient">LawSense </span>
             </h1>
+            <span className="text-slate-100 text-2xl sm:text-2xl lg:text-2xl font-bold tracking-tight mb-6">AI Legal Assistant</span>
 
             {/* Subtitle */}
-            <p className="mx-auto max-w-2xl text-lg sm:text-xl text-slate-400 mb-4">
+            <p className="mx-auto max-w-2xl text-lg sm:text-xl text-slate-400 mb-4 mt-6">
               Құқықтық сұрақтарыңызға жауап беретін жасанды интеллект көмекшісі
             </p>
             <p className="mx-auto max-w-2xl text-base text-slate-500 mb-10">
