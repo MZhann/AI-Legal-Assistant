@@ -39,8 +39,13 @@ export default function AuthenticatedChatPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [chatTitle, setChatTitle] = useState("Жаңа чат");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, isSending]);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -50,10 +55,6 @@ export default function AuthenticatedChatPage() {
 
     loadChat();
   }, [isAuthenticated, token, chatId, router]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   const loadChat = async () => {
     if (!token) return;
@@ -70,10 +71,6 @@ export default function AuthenticatedChatPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,7 +149,7 @@ export default function AuthenticatedChatPage() {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 px-4">
         <div className="max-w-3xl mx-auto py-6 space-y-6">
           {messages.length === 0 ? (
             <div className="text-center py-12">
@@ -221,7 +218,7 @@ export default function AuthenticatedChatPage() {
             </div>
           )}
           
-          <div ref={messagesEndRef} />
+          <div aria-hidden />
         </div>
       </ScrollArea>
 

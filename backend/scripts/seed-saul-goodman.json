@@ -1,0 +1,24 @@
+/**
+ * Paste one or more documents here
+ * MongoDB Extended JSON format. Import in Compass: Add Data > Import File (JSON).
+ * Password below is bcrypt hash for "password123" — replace PASSWORD_HASH by running:
+ *   node scripts/hash-password.js
+ * then paste the output into the "password" field (as a string, no $oid).
+ */
+[
+  {
+    "_id": { "$oid": "69874b287801b9a940e911d6" },
+    "email": "saul@goodman.legal",
+    "password": "PASSWORD_HASH",
+    "firstName": "Saul",
+    "lastName": "Goodman",
+    "fatherName": "",
+    "age": 45,
+    "iin": "123456789012",
+    "role": "lawyer",
+    "isOnline": false,
+    "lastSeen": { "$date": "2025-02-07T00:00:00.000Z" },
+    "createdAt": { "$date": "2025-02-07T00:00:00.000Z" },
+    "updatedAt": { "$date": "2025-02-07T00:00:00.000Z" }
+  }
+]

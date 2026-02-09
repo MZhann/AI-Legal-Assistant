@@ -11,7 +11,7 @@ import { useChatStore } from "@/store/useChatStore";
 import { RotateCcw, Scale } from "lucide-react";
 
 export function ChatContainer() {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isServiceAvailable, setIsServiceAvailable] = useState(true);
   
@@ -45,9 +45,10 @@ export function ChatContainer() {
     }
   }, [sessionId, setSessionId]);
 
-  // Scroll to bottom when messages change
+  // Scroll the ScrollArea to bottom when messages change (only the scroll area scrolls, not the page)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollAreaRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
 
   const handleSendMessage = useCallback(async (content: string) => {
@@ -102,7 +103,7 @@ export function ChatContainer() {
     <div className="flex h-full flex-col">
       {/* Main Chat Area */}
       <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
+        <ScrollArea ref={scrollAreaRef} className="h-full">
           <div className="mx-auto max-w-3xl px-4">
             {!hasMessages ? (
               /* Empty State - ChatGPT Style */
@@ -145,7 +146,7 @@ export function ChatContainer() {
                     {error}
                   </div>
                 )}
-                <div ref={messagesEndRef} />
+                <div aria-hidden />
               </div>
             )}
           </div>

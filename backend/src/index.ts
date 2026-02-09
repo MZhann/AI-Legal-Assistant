@@ -1,6 +1,6 @@
 import { createServer } from "http";
 import { createApp } from "./app.js";
-import { env, connectDatabase } from "./config/index.js";
+import { env, connectDatabase, isDevelopment } from "./config/index.js";
 import { socketService } from "./services/socket.service.js";
 
 async function bootstrap(): Promise<void> {
@@ -24,8 +24,12 @@ async function bootstrap(): Promise<void> {
       console.log(`🚀 Environment: ${env.nodeEnv}`);
       console.log(`🚀 Server running on port ${env.port}`);
       console.log(`🚀 API prefix: ${env.apiPrefix}`);
-      console.log(`🚀 Health check: http://localhost:${env.port}/health`);
-      console.log(`🚀 WebSocket: ws://localhost:${env.port}`);
+      if (isDevelopment) {
+        console.log(`🚀 Health check: http://localhost:${env.port}/health`);
+        console.log(`🚀 WebSocket: ws://localhost:${env.port}`);
+      } else {
+        console.log(`🚀 Health check: /health`);
+      }
       console.log("🚀 ═══════════════════════════════════════════════════");
     });
   } catch (error) {

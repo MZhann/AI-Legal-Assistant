@@ -34,8 +34,13 @@ export default function LawyerDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, isTyping]);
 
   // Check if user is lawyer
   useEffect(() => {
@@ -76,11 +81,6 @@ export default function LawyerDashboard() {
       unsubTyping();
     };
   }, [socket, selectedChat]);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const loadClients = async () => {
     if (!token) return;
@@ -281,7 +281,7 @@ export default function LawyerDashboard() {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
               <div className="space-y-4 max-w-3xl mx-auto">
                 {messages.map((msg) => (
                   <div
@@ -322,7 +322,7 @@ export default function LawyerDashboard() {
                   </div>
                 )}
                 
-                <div ref={messagesEndRef} />
+                <div aria-hidden />
               </div>
             </ScrollArea>
 

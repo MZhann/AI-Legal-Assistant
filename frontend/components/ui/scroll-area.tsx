@@ -17,7 +17,8 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
           className
         )}
         {...props}
-      >
+      >                                                                         
+      
         {children}
       </div>
     );
