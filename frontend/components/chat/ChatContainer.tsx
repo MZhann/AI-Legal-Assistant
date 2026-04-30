@@ -6,9 +6,21 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { apiService } from "@/services/api";
+import { apiService, ApiError } from "@/services/api";
 import { useChatStore } from "@/store/useChatStore";
 import { RotateCcw, Scale } from "lucide-react";
+
+function detectLang(text: string): "ru" | "kk" | "en" {
+  if (/[әіңғүұқөһ]/i.test(text)) return "kk";
+  if (/[а-яё]/i.test(text)) return "ru";
+  return "en";
+}
+
+function fallbackErrorText(lang: "ru" | "kk" | "en"): string {
+  if (lang === "ru") return "Не удалось получить ответ от ИИ. Попробуйте ещё раз.";
+  if (lang === "kk") return "AI-дан жауап алу мүмкін болмады. Қайталап көріңіз.";
+  return "Failed to get a response from AI. Please try again.";
+}
 
 export function ChatContainer() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -66,7 +78,7 @@ export function ChatContainer() {
 
     try {
       const response = await apiService.sendMessage(sessionId, content);
-      
+
       if (response.success) {
         addMessage({
           role: "assistant",
@@ -78,14 +90,24 @@ export function ChatContainer() {
           })),
         });
       } else {
-        throw new Error(response.error || "Failed to get response");
+        const rawErr = (response as { error?: unknown }).error;
+        const msg = typeof rawErr === "string"
+          ? rawErr
+          : (rawErr as { message?: string } | undefined)?.message
+            || fallbackErrorText(detectLang(content));
+        throw new Error(msg);
       }
     } catch (err) {
-      setError(
-        err instanceof Error 
-          ? err.message 
-          : "Қате орын алды. Қайталап көріңіз."
-      );
+      const lang = detectLang(content);
+      let message = fallbackErrorText(lang);
+
+      if (err instanceof ApiError) {
+        message = err.message || message;
+      } else if (err instanceof Error && err.message) {
+        message = err.message;
+      }
+
+      setError(message);
     } finally {
       setIsTyping(false);
     }
@@ -178,14 +200,14 @@ export function ChatContainer() {
             placeholder={
               isServiceAvailable 
                 ? "Сұрағыңызды жазыңыз..."
-                : "AI қызметі қолжетімді емес. GOOGLE_AI_API_KEY орнатыңыз."
+                : "AI қызметі қолжетімді емес. OPENAI_API_KEY орнатыңыз."
             }
           />
 
           {/* Service status warning */}
           {!isServiceAvailable && (
             <p className="text-center text-xs text-amber-500/80 mt-3">
-              ⚠️ backend/.env файлында GOOGLE_AI_API_KEY орнатыңыз
+              ⚠️ backend/.env файлында OPENAI_API_KEY орнатыңыз
             </p>
           )}
 

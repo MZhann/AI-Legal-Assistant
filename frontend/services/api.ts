@@ -46,6 +46,20 @@ interface StatusResponse {
   };
 }
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -58,7 +72,7 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -68,8 +82,25 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      const body = await response.json().catch(() => null) as
+        | { error?: { message?: string; code?: string; details?: unknown } | string }
+        | null;
+
+      let message = `HTTP ${response.status}`;
+      let code: string | undefined;
+      let details: unknown;
+
+      if (body && body.error) {
+        if (typeof body.error === 'string') {
+          message = body.error;
+        } else {
+          if (body.error.message) message = body.error.message;
+          code = body.error.code;
+          details = body.error.details;
+        }
+      }
+
+      throw new ApiError(message, response.status, code, details);
     }
 
     return response.json();

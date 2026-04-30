@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI, GenerativeModel, Content } from '@google/generative-ai';
+import OpenAI, { APIError } from 'openai';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { env } from '../config/index.js';
 import { searchConstitution, formatConstitutionContext, ConstitutionSection } from '../data/constitution-kz.js';
 
@@ -19,9 +20,30 @@ interface ChatResponse {
     completionTokens: number;
     totalTokens: number;
   };
+  model?: string;
 }
 
-// System prompt for the legal assistant
+export type AIErrorCode =
+  | 'AI_UNAVAILABLE'
+  | 'AI_RATE_LIMITED'
+  | 'AI_AUTH_ERROR'
+  | 'AI_BAD_REQUEST'
+  | 'AI_UNKNOWN';
+
+export class AIServiceError extends Error {
+  public readonly code: AIErrorCode;
+  public readonly statusCode: number;
+  public readonly retryAfterSec?: number;
+
+  constructor(message: string, code: AIErrorCode, statusCode = 500, retryAfterSec?: number) {
+    super(message);
+    this.name = 'AIServiceError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
 const SYSTEM_PROMPT = `Сіз Қазақстан Республикасының заңнамасы бойынша AI құқықтық консультант боласыз.
 
 🌐 LANGUAGE RULE (VERY IMPORTANT - FOLLOW STRICTLY):
@@ -45,64 +67,121 @@ const SYSTEM_PROMPT = `Сіз Қазақстан Республикасының 
 
 You have access to the Constitution of the Republic of Kazakhstan.`;
 
+// Primary model first; on persistent 429 / model error we try the fallback once.
+const MODEL_CHAIN = ['gpt-4o-mini', 'gpt-3.5-turbo'] as const;
+
+const MAX_RETRIES_PER_MODEL = 2;
+const BASE_BACKOFF_MS = 800;
+const MAX_BACKOFF_MS = 4000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function parseRetryAfter(value: unknown): number | undefined {
+  if (typeof value === 'string') {
+    const n = parseFloat(value);
+    if (!Number.isNaN(n)) return n;
+  }
+  return undefined;
+}
+
+function classifyError(err: unknown): {
+  code: AIErrorCode;
+  statusCode: number;
+  retryAfterSec?: number;
+  raw: string;
+} {
+  if (err instanceof APIError) {
+    const status = err.status ?? 0;
+    const raw = err.message || `OpenAI error ${status}`;
+
+    if (status === 429) {
+      const headers = (err as APIError & { headers?: Record<string, string> }).headers;
+      const retryAfterSec = parseRetryAfter(headers?.['retry-after']);
+      return { code: 'AI_RATE_LIMITED', statusCode: 429, retryAfterSec, raw };
+    }
+    if (status === 401 || status === 403) {
+      return { code: 'AI_AUTH_ERROR', statusCode: 503, raw };
+    }
+    if (status === 400 || status === 404 || status === 422) {
+      return { code: 'AI_BAD_REQUEST', statusCode: 400, raw };
+    }
+    return { code: 'AI_UNKNOWN', statusCode: 502, raw };
+  }
+
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  if (lower.includes('429') || lower.includes('rate limit') || lower.includes('quota')) {
+    return { code: 'AI_RATE_LIMITED', statusCode: 429, raw };
+  }
+  if (lower.includes('401') || lower.includes('403') || lower.includes('api key') || lower.includes('unauthorized')) {
+    return { code: 'AI_AUTH_ERROR', statusCode: 503, raw };
+  }
+  if (lower.includes('400') || lower.includes('invalid')) {
+    return { code: 'AI_BAD_REQUEST', statusCode: 400, raw };
+  }
+  return { code: 'AI_UNKNOWN', statusCode: 502, raw };
+}
+
 class AIService {
-  private model: GenerativeModel | null = null;
+  private client: OpenAI | null = null;
   private isInitialized = false;
+  private activeModelName: string = MODEL_CHAIN[0];
 
   constructor() {
     this.initialize();
   }
 
   private initialize(): void {
-    if (!env.googleAiApiKey) {
-      console.warn('⚠️  GOOGLE_AI_API_KEY not set. AI features will be disabled.');
+    const apiKey = env.openaiApiKey;
+    if (!apiKey) {
+      console.warn('⚠️  OPENAI_API_KEY not set. AI features will be disabled.');
       return;
     }
 
     try {
-      const genAI = new GoogleGenerativeAI(env.googleAiApiKey);
-      // Using gemini-2.0-flash - fast and cheap
-      this.model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.0-flash',
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.9,
-          topK: 40,
-          maxOutputTokens: 2048,
-        },
-      });
+      this.client = new OpenAI({ apiKey });
       this.isInitialized = true;
-      console.log('✅ AI Service initialized with Gemini 2.0 Flash');
+      console.log(
+        `✅ AI Service initialized (OpenAI). Primary: ${MODEL_CHAIN[0]}, fallback: ${MODEL_CHAIN[1]}`
+      );
     } catch (error) {
       console.error('❌ Failed to initialize AI Service:', error);
     }
   }
 
   public isAvailable(): boolean {
-    return this.isInitialized && this.model !== null;
+    return this.isInitialized && this.client !== null;
+  }
+
+  public getActiveModel(): string {
+    return this.activeModelName;
   }
 
   /**
    * Process a chat message with RAG (Retrieval Augmented Generation)
+   * with retries and automatic fallback to a secondary model on 429/server errors.
    */
   async chat(
-    userMessage: string, 
+    userMessage: string,
     conversationHistory: ChatMessage[] = []
   ): Promise<ChatResponse> {
-    if (!this.isAvailable()) {
-      throw new Error('AI Service is not available. Please check your API key.');
+    if (!this.isAvailable() || !this.client) {
+      throw new AIServiceError(
+        'AI service is not configured. OPENAI_API_KEY is missing.',
+        'AI_UNAVAILABLE',
+        503
+      );
     }
 
-    // RAG: Search Constitution for relevant context
     const relevantSections = searchConstitution(userMessage, 5);
     const constitutionContext = formatConstitutionContext(relevantSections);
 
-    // Detect language from user message
     const hasKazakh = /[әіңғүұқөһ]/i.test(userMessage);
     const hasCyrillic = /[а-яё]/i.test(userMessage);
     const detectedLang = hasKazakh ? 'KAZAKH' : (hasCyrillic ? 'RUSSIAN' : 'ENGLISH');
 
-    // Build the prompt with RAG context
     const ragPrompt = `
 RELEVANT CONSTITUTION ARTICLES:
 ${constitutionContext}
@@ -116,61 +195,101 @@ DETECTED LANGUAGE: ${detectedLang}
 Answer the user's question based on the Constitution articles above. Cite relevant articles when applicable.
 `;
 
-    // Convert conversation history to Gemini format
-    const history: Content[] = conversationHistory.map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
-    }));
+    // Cap history to last 18 turns to keep request small and predictable.
+    const trimmedHistory = conversationHistory.slice(-18);
 
-    try {
-      // Start a chat session
-      const chat = this.model!.startChat({
-        history: [
-          {
-            role: 'user',
-            parts: [{ text: 'System instructions: ' + SYSTEM_PROMPT }],
-          },
-          {
-            role: 'model',
-            parts: [{ text: 'Understood. I am an AI legal consultant for Kazakhstan law. I will follow all the rules and always cite relevant articles. How can I help you?' }],
-          },
-          ...history,
-        ],
-      });
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...trimmedHistory.map<ChatCompletionMessageParam>(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content,
+      })),
+      { role: 'user', content: ragPrompt },
+    ];
 
-      // Send the RAG-enhanced prompt
-      const result = await chat.sendMessage(ragPrompt);
-      const response = result.response;
-      const text = response.text();
+    let lastClassified: ReturnType<typeof classifyError> | undefined;
 
-      // Extract citations from relevant sections
-      const citations = relevantSections.map(section => ({
-        article: section.article,
-        title: section.title,
-        excerpt: section.content.substring(0, 200) + '...',
-      }));
+    for (const modelName of MODEL_CHAIN) {
+      for (let attempt = 0; attempt <= MAX_RETRIES_PER_MODEL; attempt++) {
+        try {
+          const completion = await this.client.chat.completions.create({
+            model: modelName,
+            messages,
+            temperature: 0.7,
+            top_p: 0.9,
+            max_tokens: 2048,
+          });
 
-      return {
-        message: text,
-        citations,
-        usage: {
-          promptTokens: response.usageMetadata?.promptTokenCount || 0,
-          completionTokens: response.usageMetadata?.candidatesTokenCount || 0,
-          totalTokens: response.usageMetadata?.totalTokenCount || 0,
-        },
-      };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('❌ AI Chat Error:', errorMessage);
-      
-      // Log full error for debugging
-      if (error instanceof Error && error.stack) {
-        console.error('Stack:', error.stack);
+          const text = completion.choices[0]?.message?.content?.trim() ?? '';
+          if (!text) {
+            throw new AIServiceError(
+              'Empty response from AI provider',
+              'AI_UNKNOWN',
+              502
+            );
+          }
+
+          this.activeModelName = modelName;
+
+          const citations = relevantSections.map(section => ({
+            article: section.article,
+            title: section.title,
+            excerpt: section.content.substring(0, 200) + '...',
+          }));
+
+          return {
+            message: text,
+            citations,
+            usage: {
+              promptTokens: completion.usage?.prompt_tokens ?? 0,
+              completionTokens: completion.usage?.completion_tokens ?? 0,
+              totalTokens: completion.usage?.total_tokens ?? 0,
+            },
+            model: modelName,
+          };
+        } catch (error: unknown) {
+          // If we already wrapped it ourselves, propagate.
+          if (error instanceof AIServiceError) throw error;
+
+          const classified = classifyError(error);
+          lastClassified = classified;
+
+          console.error(
+            `❌ AI chat error on model=${modelName} attempt=${attempt + 1}/${MAX_RETRIES_PER_MODEL + 1} ` +
+              `code=${classified.code} status=${classified.statusCode}: ${classified.raw}`
+          );
+
+          // Don't retry on auth/bad-request – these will not recover.
+          if (classified.code === 'AI_AUTH_ERROR' || classified.code === 'AI_BAD_REQUEST') {
+            throw new AIServiceError(classified.raw, classified.code, classified.statusCode);
+          }
+
+          if (attempt < MAX_RETRIES_PER_MODEL) {
+            const backoff = Math.min(BASE_BACKOFF_MS * Math.pow(2, attempt), MAX_BACKOFF_MS);
+            const suggested =
+              classified.code === 'AI_RATE_LIMITED' && classified.retryAfterSec
+                ? Math.min(classified.retryAfterSec * 1000, MAX_BACKOFF_MS)
+                : 0;
+            const waitMs = Math.max(backoff, suggested);
+            console.warn(`⏳ Retrying after ${waitMs}ms on model ${modelName}...`);
+            await sleep(waitMs);
+            continue;
+          }
+          break;
+        }
       }
-      
-      // Just pass through the actual error message
-      throw new Error(`AI Error: ${errorMessage}`);
+      console.warn(`↪️  Falling back from ${modelName} to next model in chain`);
     }
+
+    if (lastClassified) {
+      throw new AIServiceError(
+        lastClassified.raw,
+        lastClassified.code,
+        lastClassified.statusCode,
+        lastClassified.retryAfterSec
+      );
+    }
+    throw new AIServiceError('Unknown AI failure', 'AI_UNKNOWN', 502);
   }
 
   /**
@@ -181,6 +300,4 @@ Answer the user's question based on the Constitution articles above. Cite releva
   }
 }
 
-// Singleton instance
 export const aiService = new AIService();
-

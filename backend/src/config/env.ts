@@ -24,7 +24,7 @@ interface EnvConfig {
   apiPrefix: string;
   corsOrigin: string;
   googleAiApiKey: string;
-  openaiApiKey?: string;
+  openaiApiKey: string;
   jwtSecret: string;
   jwtExpiresIn: string;
 }
@@ -40,7 +40,7 @@ export const env: EnvConfig = {
     process.env.CORS_ORIGIN ||
     (isDevelopment ? "http://localhost:3000" : ""),
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY || "",
-  openaiApiKey: process.env.OPENAI_API_KEY,
+  openaiApiKey: process.env.OPENAI_API_KEY || "",
   jwtSecret:
     process.env.JWT_SECRET ||
     (isDevelopment ? "your-super-secret-jwt-key-change-in-production" : ""),

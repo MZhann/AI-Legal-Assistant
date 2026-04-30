@@ -1,7 +1,59 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { aiService } from '../services/ai.service.js';
+import { aiService, AIServiceError, AIErrorCode } from '../services/ai.service.js';
 import { success, error } from '../utils/response.js';
+
+type SupportedLang = 'ru' | 'kk' | 'en';
+
+function detectLanguage(text: string): SupportedLang {
+  if (/[әіңғүұқөһ]/i.test(text)) return 'kk';
+  if (/[а-яё]/i.test(text)) return 'ru';
+  return 'en';
+}
+
+function getFriendlyAIErrorMessage(
+  code: AIErrorCode,
+  lang: SupportedLang,
+  retryAfterSec?: number
+): string {
+  const wait = retryAfterSec ? Math.ceil(retryAfterSec) : undefined;
+  switch (code) {
+    case 'AI_RATE_LIMITED':
+      if (lang === 'ru') {
+        return wait
+          ? `Сервис ИИ временно перегружен (превышен лимит запросов). Попробуйте снова через ~${wait} сек.`
+          : 'Сервис ИИ временно перегружен (превышен лимит запросов). Попробуйте снова через минуту.';
+      }
+      if (lang === 'kk') {
+        return wait
+          ? `AI қызметі уақытша шамадан тыс жүктелген (сұраныс лимиті асып кетті). ~${wait} сек кейін қайталап көріңіз.`
+          : 'AI қызметі уақытша шамадан тыс жүктелген. Бір минуттан кейін қайталап көріңіз.';
+      }
+      return wait
+        ? `AI service is rate-limited. Please retry in ~${wait}s.`
+        : 'AI service is rate-limited. Please retry in a minute.';
+
+    case 'AI_AUTH_ERROR':
+      if (lang === 'ru') return 'Сервис ИИ не настроен: проверьте OPENAI_API_KEY на сервере.';
+      if (lang === 'kk') return 'AI қызметі бапталмаған: серверде OPENAI_API_KEY тексеріңіз.';
+      return 'AI service is not configured: check OPENAI_API_KEY on the server.';
+
+    case 'AI_UNAVAILABLE':
+      if (lang === 'ru') return 'Сервис ИИ временно недоступен. Попробуйте позже.';
+      if (lang === 'kk') return 'AI қызметі уақытша қолжетімсіз. Кейінірек қайталап көріңіз.';
+      return 'AI service is temporarily unavailable. Please try again later.';
+
+    case 'AI_BAD_REQUEST':
+      if (lang === 'ru') return 'Не удалось обработать запрос. Переформулируйте вопрос.';
+      if (lang === 'kk') return 'Сұранысты өңдеу мүмкін болмады. Сұрағыңызды қайта тұжырымдаңыз.';
+      return 'Could not process the request. Please rephrase your question.';
+
+    default:
+      if (lang === 'ru') return 'Не удалось получить ответ от ИИ. Попробуйте ещё раз.';
+      if (lang === 'kk') return 'AI-дан жауап алу мүмкін болмады. Қайталап көріңіз.';
+      return 'Failed to get a response from AI. Please try again.';
+  }
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -100,30 +152,46 @@ export const sendMessage = async (
       content: message.trim(),
     });
 
-    // Get AI response with RAG
-    const aiResponse = await aiService.chat(message.trim(), session.messages.slice(0, -1));
+    try {
+      const aiResponse = await aiService.chat(message.trim(), session.messages.slice(0, -1));
 
-    // Add assistant response to history
-    session.messages.push({
-      role: 'assistant',
-      content: aiResponse.message,
-    });
+      session.messages.push({
+        role: 'assistant',
+        content: aiResponse.message,
+      });
 
-    // Update last activity
-    session.lastActivity = new Date();
+      session.lastActivity = new Date();
 
-    // Keep only last 20 messages to manage context window
-    if (session.messages.length > 20) {
-      session.messages = session.messages.slice(-20);
+      if (session.messages.length > 20) {
+        session.messages = session.messages.slice(-20);
+      }
+
+      res.json(success({
+        response: aiResponse.message,
+        citations: aiResponse.citations,
+        usage: aiResponse.usage,
+        sessionId: session.id,
+        messageCount: session.messages.length,
+      }));
+    } catch (aiErr) {
+      // Roll back the optimistic user message we just pushed so a retry doesn't duplicate it.
+      session.messages.pop();
+
+      if (aiErr instanceof AIServiceError) {
+        const lang = detectLanguage(message);
+        const friendly = getFriendlyAIErrorMessage(aiErr.code, lang, aiErr.retryAfterSec);
+
+        if (aiErr.retryAfterSec) {
+          res.setHeader('Retry-After', Math.ceil(aiErr.retryAfterSec).toString());
+        }
+
+        res.status(aiErr.statusCode).json(error(friendly, aiErr.code, {
+          retryAfterSec: aiErr.retryAfterSec,
+        }));
+        return;
+      }
+      throw aiErr;
     }
-
-    res.json(success({
-      response: aiResponse.message,
-      citations: aiResponse.citations,
-      usage: aiResponse.usage,
-      sessionId: session.id,
-      messageCount: session.messages.length,
-    }));
   } catch (err) {
     next(err);
   }
@@ -253,7 +321,7 @@ export const getStatus = async (
 
     res.json(success({
       status: isAvailable ? 'available' : 'unavailable',
-      model: 'gemini-1.5-flash',
+      model: aiService.getActiveModel(),
       features: {
         chat: isAvailable,
         rag: true,
