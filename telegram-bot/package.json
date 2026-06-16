@@ -1,0 +1,28 @@
+{
+  "name": "ai-legal-assistant-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for AI Legal Assistant - login, pick a chat, and continue the AI conversation from Telegram",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.3.1",
+    "mongoose": "^8.0.3",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
